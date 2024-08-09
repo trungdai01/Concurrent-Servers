@@ -31,4 +31,4 @@ void report_peer_connected(const struct sockaddr_in* sa, socklen_t salen);
 int listen_inet_socket(int portnum);
 
 // Sets the given socket into non-blocking mode.
-// void make_socket_non_blocking(int sockfd);
+void make_socket_non_blocking(int sockfd);

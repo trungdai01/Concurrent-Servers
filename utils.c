@@ -49,9 +49,9 @@ void report_peer_connected(const struct sockaddr_in* sa, socklen_t salen) {
   char hostbuf[NI_MAXHOST];
   char portbuf[NI_MAXSERV];
   if (getnameinfo((struct sockaddr*)sa, salen, hostbuf, NI_MAXHOST, portbuf, NI_MAXSERV, 0) == 0) {
-    printf("peer (%s, %s) connected\n", hostbuf, portbuf);
+    printf("[REPORT-LOG] peer (%s, %s) connected\n", hostbuf, portbuf);
   } else {
-    printf("peer (unknonwn) connected\n");
+    printf("[REPORT-LOG] peer (unknonwn) connected\n");
   }
 }
 
@@ -83,4 +83,11 @@ int listen_inet_socket(int portnum) {
   }
 
   return sockfd;
+}
+
+void make_socket_non_blocking(int sockfd) {
+  u_long mode = 1;
+  if (ioctlsocket(sockfd, FIONBIO, &mode) != NO_ERROR) {
+    perror_die("ioctlsocket FIONBIO ERROR");
+  }
 }

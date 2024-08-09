@@ -15,22 +15,19 @@ int main(int argc, const char** argv) {
   }
   printf("Listening on port: %d\n", portnum);
 
-  int sockfd = listen_inet_socket(portnum);
-  printf("sockfd: %d\n", sockfd);
+  int server_sockfd = listen_inet_socket(portnum);
+  printf("server_sockfd: %d\n", server_sockfd);
   struct sockaddr_in peer_addr;
   socklen_t peer_addr_len = sizeof(peer_addr);
 
-  int newSockFd = accept(sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len);
+  int newSockFd = accept(server_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len);
   if (newSockFd < 0) {
     perror_die("[MAIN-LOOP] ERROR CONNECTION on accept");
   }
   printf("newSockFd: %d\n", newSockFd);
   report_peer_connected(&peer_addr, peer_addr_len);
 
-  u_long mode = 1;
-  if (ioctlsocket(newSockFd, FIONBIO, &mode) != NO_ERROR) {
-    perror_die("ioctlsocket FIONBIO ERROR");
-  }
+  make_socket_non_blocking(newSockFd);
 
   while (1) {
     uint8_t buf[1024];
@@ -49,7 +46,7 @@ int main(int argc, const char** argv) {
     printf("recv returned %d bytes\n", len);
   }
   closesocket(newSockFd);
-  closesocket(sockfd);
+  closesocket(server_sockfd);
   cleanupWinsock();
   return 0;
 }
