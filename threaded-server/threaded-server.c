@@ -59,10 +59,10 @@ void* server_thread(void* arg) {
   thread_config_t* thread_config = (thread_config_t*)arg;
   int sockfd = thread_config->sockfd;
   free(thread_config);
-  unsigned long id = (unsigned long)pthread_self();
-  printf("Thread %lu created to handle connection with socket %d\n", id, sockfd);
+  pthread_t thread_id = pthread_self();
+  // printf("Thread %p created to handle connection with socket %d\n", (void*)thread_id, sockfd);
   serve_connection(sockfd);
-  printf("Thread %lu done\n", id);
+  // printf("Thread %p done\n", (void*)thread_id);
   return 0;
 }
 

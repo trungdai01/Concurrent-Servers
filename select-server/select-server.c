@@ -28,25 +28,25 @@ typedef struct {
 peer_state_t global_state[MAXFDs];
 
 typedef struct {
-  bool want_recv;
-  bool want_send;
+  bool ready_to_recv;
+  bool ready_to_send;
 } fd_status_t;
 
 const fd_status_t fd_status_R = {
-    .want_recv = true,
-    .want_send = false,
+    .ready_to_recv = true,
+    .ready_to_send = false,
 };
 const fd_status_t fd_status_S = {
-    .want_recv = false,
-    .want_send = true,
+    .ready_to_recv = false,
+    .ready_to_send = true,
 };
 const fd_status_t fd_status_RS = {
-    .want_recv = true,
-    .want_send = true,
+    .ready_to_recv = true,
+    .ready_to_send = true,
 };
 const fd_status_t fd_status_NORS = {
-    .want_recv = false,
-    .want_send = false,
+    .ready_to_recv = false,
+    .ready_to_send = false,
 };
 
 fd_status_t on_peer_connected(int client_sockfd, const struct sockaddr_in* peer_addr, socklen_t peer_addr_len) {
@@ -59,10 +59,11 @@ fd_status_t on_peer_connected(int client_sockfd, const struct sockaddr_in* peer_
   peerState->sendptr = 0;
   peerState->sendbuf_end = 1;
 
+  // Signal that peer is ready to send a message
   return fd_status_S;
 }
 
-fd_status_t on_peer_ready_recv(int client_sockfd) {
+fd_status_t on_peer_ready_to_recv(int client_sockfd) {
   assert(client_sockfd < MAXFDs);
   peer_state_t* peerState = &global_state[client_sockfd];
 
@@ -72,18 +73,24 @@ fd_status_t on_peer_ready_recv(int client_sockfd) {
     // receive more data.
     return fd_status_S;
   }
-  printf("here\n");
+  printf("receiving a message from client %d\n", client_sockfd);
 
   uint8_t buf[1024];
   int bytesRecv = recv(client_sockfd, buf, sizeof buf, 0);
+  printf("bytesRecv: %d\n", bytesRecv);
   if (bytesRecv == 0) {
     // The peer disconnected.
+    printf("peer is disconnected\n");
     return fd_status_NORS;
-  } else if (bytesRecv == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK) {
-    // The client socket is not *really* ready for recv; wait until it is.
-    return fd_status_R;
-  } else {
-    perror_die("recv");
+  } else if (bytesRecv < 0) {
+    if (bytesRecv == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK) {
+      // The client socket is not *really* ready for recv; wait until it is.
+      printf("peer is not ready to receive\n");
+      return fd_status_R;
+    } else {
+      printf("die\n");
+      perror_die("recv");
+    }
   }
 
   bool ready_to_send = false;
@@ -109,12 +116,12 @@ fd_status_t on_peer_ready_recv(int client_sockfd) {
   // Report reading readiness iff there's nothing to send to the peer as a
   // result of the latest recv.
   return (fd_status_t){
-      .want_recv = !ready_to_send,
-      .want_send = ready_to_send,
+      .ready_to_recv = !ready_to_send,
+      .ready_to_send = ready_to_send,
   };
 }
 
-fd_status_t on_peer_ready_send(int client_sockfd) {
+fd_status_t on_peer_ready_to_send(int client_sockfd) {
   assert(client_sockfd < MAXFDs);
   peer_state_t* peerState = &global_state[client_sockfd];
 
@@ -132,10 +139,12 @@ fd_status_t on_peer_ready_send(int client_sockfd) {
     }
   }
   if (numBytesSent < msglen) {
+    printf("server is sending message to %d", client_sockfd);
     peerState->sendptr += numBytesSent;
     return fd_status_S;
   } else {
     // Everything was sent successfully; reset the send queue.
+    printf("server sent messages successfully\n");
     peerState->sendptr = 0;
     peerState->sendbuf_end = 0;
 
@@ -185,6 +194,7 @@ int main(int argc, char** argv) {
   // makes it unnecessary for select to iterate all the way to FD_SETSIZE on
   // every call.
   int fdset_max = server_sockfd;
+  int loopNum = 0;
 
   while (1) {
     fd_set recvfd_set = recvfd_monitor_set;
@@ -194,7 +204,7 @@ int main(int argc, char** argv) {
     if (numOfReady == SOCKET_ERROR) {
       perror_die("[MAIN-LOOP] select error");
     }
-    printf("numOfReady: %d\n", numOfReady);
+    printf("Loop: %d, numOfReady: %d\n", loopNum++, numOfReady);
 
     // numOfReady tells us the total number of ready events; if one socket is both
     // readable and writable it will be 2. Therefore, it's decremented when
@@ -204,6 +214,7 @@ int main(int argc, char** argv) {
       if (FD_ISSET(fd, &recvfd_set)) {
         numOfReady--;
 
+        printf("[MAIN-LOOP] %d receive a message\n", fd);
         if (fd == server_sockfd) {
           // The server socket is ready; this means a new peer is connecting.
           struct sockaddr_in peer_addr;
@@ -228,32 +239,33 @@ int main(int argc, char** argv) {
               fdset_max = client_sockfd;
             }
 
-            fd_status_t server_status = on_peer_connected(client_sockfd, &peer_addr, peer_addr_len);
-            if (server_status.want_recv) {
+            // Return a send status
+            fd_status_t client_status = on_peer_connected(client_sockfd, &peer_addr, peer_addr_len);
+            if (client_status.ready_to_recv) {
               FD_SET(client_sockfd, &recvfd_monitor_set);
             } else {
               FD_CLR(client_sockfd, &recvfd_monitor_set);
             }
-            if (server_status.want_send) {
+            if (client_status.ready_to_send) {
               FD_SET(client_sockfd, &sendfd_monitor_set);
             } else {
               FD_CLR(client_sockfd, &sendfd_monitor_set);
             }
           }
         } else {
-          printf("recv new message\n");
-          fd_status_t server_status = on_peer_ready_recv(fd);
-          if (server_status.want_recv) {
+          printf("%d sent a new message to server\n", fd);
+          fd_status_t server_status = on_peer_ready_to_recv(fd);
+          if (server_status.ready_to_recv) {
             FD_SET(fd, &recvfd_monitor_set);
           } else {
             FD_CLR(fd, &recvfd_monitor_set);
           }
-          if (server_status.want_send) {
+          if (server_status.ready_to_send) {
             FD_SET(fd, &sendfd_monitor_set);
           } else {
             FD_CLR(fd, &sendfd_monitor_set);
           }
-          if (!server_status.want_recv && !server_status.want_send) {
+          if (!server_status.ready_to_recv && !server_status.ready_to_send) {
             printf("socket %d closing\n", fd);
             closesocket(fd);
           }
@@ -263,18 +275,19 @@ int main(int argc, char** argv) {
       // Check if this fd became sendable.
       if (FD_ISSET(fd, &sendfd_set)) {
         numOfReady--;
-        fd_status_t server_status = on_peer_ready_send(fd);
-        if (server_status.want_recv) {
+        printf("server want to send a message to %d\n", fd);
+        fd_status_t server_status = on_peer_ready_to_send(fd);
+        if (server_status.ready_to_recv) {
           FD_SET(fd, &recvfd_monitor_set);
         } else {
           FD_CLR(fd, &recvfd_monitor_set);
         }
-        if (server_status.want_send) {
+        if (server_status.ready_to_send) {
           FD_SET(fd, &sendfd_monitor_set);
         } else {
           FD_CLR(fd, &sendfd_monitor_set);
         }
-        if (!server_status.want_recv && !server_status.want_send) {
+        if (!server_status.ready_to_recv && !server_status.ready_to_send) {
           printf("socket %d closing\n", fd);
           closesocket(fd);
         }

@@ -63,7 +63,7 @@ int listen_inet_socket(int portnum) {
 
   // This helps avoid spurious EADDRINUSE when the previous instance of this
   // server died.
-  int opt = 1;
+  const char opt = '1';
   if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
     perror_die("setsockopt");
   }
