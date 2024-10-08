@@ -1,0 +1,3 @@
+D:/Programming/C, C++/Concurrent Servers/uv-servers/uv-timer-threads/build/CMakeFiles/uv-timer-threads.dir
+D:/Programming/C, C++/Concurrent Servers/uv-servers/uv-timer-threads/build/CMakeFiles/edit_cache.dir
+D:/Programming/C, C++/Concurrent Servers/uv-servers/uv-timer-threads/build/CMakeFiles/rebuild_cache.dir

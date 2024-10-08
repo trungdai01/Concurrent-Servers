@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include "utils.h"
 
@@ -67,6 +68,7 @@ void* server_thread(void* arg) {
 }
 
 int main(int argc, char** argv) {
+  printf("here");
   if (initializeWinsock() != 0) {
     return 1;
   }
