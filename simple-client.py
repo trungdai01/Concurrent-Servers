@@ -15,9 +15,9 @@ class ReadThread(threading.Thread):
     def run(self):
         fullbuf = b""
         while True:
-            buf = self.sockobj.recv(self.bufsize)
-            logging.info("{%s} received {%s}", self.name, buf)
-            fullbuf += buf
+            recv_buf = self.sockobj.recv(self.bufsize)
+            logging.info("{%s} received {%s}", self.name, recv_buf)
+            fullbuf += recv_buf
             if b"1111" in fullbuf:
                 break
 
@@ -28,35 +28,35 @@ def make_new_connection(name, host, port):
     Sets a pre-set sequence of messages to the server with pre-set delays; in
     parallel, reads from the socket in a separate thread.
     """
-    sockobj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sockobj.connect((host, port))
-    if sockobj.recv(1) != b"*":
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+    if client_socket.recv(1) != b"*":
         logging.error("Something is wrong! Did not receive *")
     logging.info("{%s} connected...", name)
 
-    rthread = ReadThread(name, sockobj)
+    rthread = ReadThread(name, client_socket)
     rthread.start()
 
-    s = b"^abc$de^abte$f"
-    logging.info("{%s} sending {%s}", name, s)
-    sockobj.send(s)
+    message = b"^abc$de^abte$f"
+    logging.info("{%s} sending {%s}", name, message)
+    client_socket.send(message)
     time.sleep(1.0)
 
-    s = b"xyz^123"
-    logging.info("{%s} sending {%s}", name, s)
-    sockobj.send(s)
+    message = b"xyz^123"
+    logging.info("{%s} sending {%s}", name, message)
+    client_socket.send(message)
     time.sleep(1.0)
 
     # The 0000 sent to the server here will result in an echo of 1111, which is
     # a sign for the reading thread to terminate.
     # Add WXY after 0000 to enable kill-switch in some servers.
-    s = b"25$^ab0000$abab"
-    logging.info("{%s} sending {%s}", name, s)
-    sockobj.send(s)
+    message = b"25$^ab0000$abab"
+    logging.info("{%s} sending {%s}", name, message)
+    client_socket.send(message)
     time.sleep(0.2)
 
     rthread.join()
-    sockobj.close()
+    client_socket.close()
     logging.info("{%s} disconnecting", name)
 
 

@@ -16,12 +16,10 @@ def coroutine(func):
 @coroutine
 def client_protocol(target=None):
     while True:
-        # Each iteration of this outer loop processes a whole "frame" (bytes
-        # delimited by ^....$).
+        # Each iteration of this outer loop processes a whole "frame" (bytes delimited by ^....$).
         b = yield
         if b == ord(b'^'):
-            # Frame starts. Loop until end is encountered and send replies to
-            # target.
+            # Frame starts. Loop until end is encountered and send replies to target.
             while True:
                 b = yield
                 if b == ord(b'$'):
@@ -37,7 +35,7 @@ def reply_processor(sockobj):
 
 
 def serve_connection(sockobj, client_address):
-    print('{0} connected'.format(client_address))
+    print(f'{client_address} connected')
     sockobj.sendall(b'*')
     protocol = client_protocol(target=reply_processor(sockobj))
 

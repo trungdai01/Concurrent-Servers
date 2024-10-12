@@ -9,6 +9,7 @@ void on_timer(uv_timer_t* timer) {
     uint64_t timestamp = uv_hrtime();
     printf("on_timer [%" PRIu64 " ms]\n", (timestamp / 1000000) % 100000);
 
+    // The following code is going to block this callee from returning to the main thread
     if (rand() % 5 == 0) {
         printf("Sleeping...\n");
         sleep(3);

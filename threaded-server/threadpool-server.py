@@ -7,14 +7,14 @@ import sys
 ProcessingState = Enum("ProcessingState", "WAIT_FOR_MSG IN_MSG")
 
 
-def serve_connection(sockObj: socket, clientAddress):
-    print(f"{clientAddress} connected")
-    sockObj.sendall(b"*")
+def serve_connection(sock_obj: socket, client_address):
+    print(f"{client_address} connected")
+    sock_obj.sendall(b"*")
     state = ProcessingState.WAIT_FOR_MSG
 
     while True:
         try:
-            buf = sockObj.recv(1024)
+            buf = sock_obj.recv(1024)
             if not buf:
                 break
         except IOError:
@@ -27,13 +27,13 @@ def serve_connection(sockObj: socket, clientAddress):
                 if byte == ord(b"$"):
                     state = ProcessingState.WAIT_FOR_MSG
                 else:
-                    sockObj.send(bytes([byte + 1]))
+                    sock_obj.send(bytes([byte + 1]))
             else:
                 assert False
 
-    print(f"{clientAddress} done")
+    print(f"{client_address} done")
     sys.stdout.flush()
-    sockObj.close()
+    sock_obj.close()
 
 
 if __name__ == "__main__":
@@ -43,15 +43,15 @@ if __name__ == "__main__":
     args = argparser.parse_args()
 
     pool = ThreadPoolExecutor(args.n)
-    sockobj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sockobj.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sockobj.bind(("localhost", args.port))
-    sockobj.listen(15)
+    sock_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock_obj.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock_obj.bind(("localhost", args.port))
+    sock_obj.listen(15)
 
     try:
         while True:
-            client_socket, client_address = sockobj.accept()
+            client_socket, client_address = sock_obj.accept()
             pool.submit(serve_connection, client_socket, client_address)
     except KeyboardInterrupt as exception:
         print(exception)
-        sockobj.close()
+        sock_obj.close()
